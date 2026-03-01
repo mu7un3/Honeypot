@@ -1,0 +1,49 @@
+# ── Credentials — NEVER commit ────────────────────────────────
+honeypot/.env
+**/.env
+
+# ── Runtime files ──────────────────────────────────────────────
+honeypot/honeypot.log
+honeypot/ioc_export.json
+honeypot/blocked_ips.txt
+honeypot/fail2ban_manual.log
+honeypot/geo_block_recommendations.txt
+honeypot/honeypot-stdout.log
+honeypot/honeypot-stderr.log
+honeypot/dashboard-stdout.log
+honeypot/dashboard-stderr.log
+
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+
+# ── Node / Next.js ─────────────────────────────────────────────
+node_modules/
+honeypot-analytics/.next/
+honeypot-analytics/out/
+honeypot-analytics/.env
+honeypot-analytics/.env.local
+honeypot-analytics/.env*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
