@@ -571,7 +571,7 @@ if __name__ == "__main__":
     
     result = info.get_info(ip)
     
-    print("📍 LOCATION")
+    print("\nLOCATION")
     print(f"   City:         {result['city']}, {result['region']}")
     print(f"   Country:      {result['country']} ({result['country_code']})")
     print(f"   Continent:    {result['continent']}")
@@ -579,26 +579,26 @@ if __name__ == "__main__":
     print(f"   Coordinates:  {result['lat']}, {result['lon']}")
     print(f"   Timezone:     {result['timezone']} ({result['utc_offset']})")
     
-    print(f"\n🌐 NETWORK")
+    print(f"\nNETWORK")
     print(f"   ISP:          {result['isp']}")
     print(f"   ASN:          {result['asn']}")
     print(f"   Org:          {result['org']}")
     print(f"   Type:         {result['connection_type']}")
     print(f"   Reverse DNS:  {result['reverse_dns']}")
     
-    print(f"\n📋 SUPPLEMENTAL")
+    print(f"\nSUPPLEMENTAL")
     print(f"   Currency:     {result['currency']}")
     print(f"   Languages:    {result['languages']}")
     print(f"   Calling Code: {result['calling_code']}")
     
-    print(f"\n🔒 SECURITY")
-    print(f"   Proxy:        {'⚠️ YES' if result['is_proxy'] else 'No'}")
-    print(f"   VPN:          {'⚠️ YES' if result['is_vpn'] else 'No'}")
-    print(f"   Tor:          {'⚠️ YES' if result['is_tor'] else 'No'}")
-    print(f"   Hosting:      {'⚠️ YES' if result['is_hosting'] else 'No'}")
+    print(f"\nSECURITY")
+    print(f"   Proxy:        {'YES' if result['is_proxy'] else 'No'}")
+    print(f"   VPN:          {'YES' if result['is_vpn'] else 'No'}")
+    print(f"   Tor:          {'YES' if result['is_tor'] else 'No'}")
+    print(f"   Hosting:      {'YES' if result['is_hosting'] else 'No'}")
     print(f"   Risk Score:   {result['proxy_risk_score']}/100")
     
-    print(f"\n📊 HISTORY")
+    print(f"\nHISTORY")
     profile = result['attacker_profile']
     if profile.get('is_returning'):
         print(f"   Returning:    Yes")
@@ -611,5 +611,5 @@ if __name__ == "__main__":
     else:
         print(f"   First time attacker")
     
-    print(f"\n📡 Geo Source: {result['geo_source']}")
+    print(f"\nGeo Source: {result['geo_source']}")
     print(f"{'='*60}\n")

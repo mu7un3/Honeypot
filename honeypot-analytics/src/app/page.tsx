@@ -226,10 +226,10 @@ function AttackDetail({ attack, onClose }: { attack: AttackRow; onClose: () => v
               <Shield className="w-3 h-3" /> Security Flags
             </h4>
             <div className="flex flex-wrap gap-2">
-              {attack.info.is_tor && <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-semibold">🧅 Tor Exit Node</span>}
-              {attack.info.is_vpn && <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-semibold">🔒 VPN Provider</span>}
-              {attack.info.is_proxy && <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-semibold">🌐 Proxy Detected</span>}
-              {attack.info.is_hosting && <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">☁️ Hosting/Datacenter</span>}
+              {attack.info.is_tor && <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-semibold">Tor Exit Node</span>}
+              {attack.info.is_vpn && <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-semibold">VPN Provider</span>}
+              {attack.info.is_proxy && <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-semibold">Proxy Detected</span>}
+              {attack.info.is_hosting && <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">Hosting/Datacenter</span>}
             </div>
             {attack.info.proxy_risk_score && attack.info.proxy_risk_score > 0 && (
               <p className="text-xs text-zinc-500 mt-2">Risk Score: {attack.info.proxy_risk_score}/100</p>
