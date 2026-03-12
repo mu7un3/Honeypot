@@ -32,16 +32,41 @@ interface Attack {
   info: {
     ip:                string
     country:           string
+    country_code?:     string
     city:              string
+    region?:           string
+    postal?:           string
+    continent?:        string
     isp?:              string
     asn?:              string
     org?:              string
+    connection_type?:  string
     attack_signature:  string
     reverse_dns?:      string
     lat?:              number
     lon?:              number
+    timezone?:         string
+    currency?:         string
+    languages?:        string
+    calling_code?:     string
     threat_indicators?: string[]
     whois?:            string
+    is_proxy?:         boolean
+    is_vpn?:           boolean
+    is_tor?:           boolean
+    is_hosting?:       boolean
+    proxy_risk_score?: number
+    attacker_profile?: {
+      is_returning: boolean
+      is_new: boolean
+      first_seen?: string
+      last_seen?: string
+      total_attacks?: number
+      unique_ports?: number
+      avg_threat_score?: number
+      attacks_per_day?: number
+      persistence_score?: number
+    }
   }
 }
 

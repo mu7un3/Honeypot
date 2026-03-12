@@ -1,4 +1,4 @@
-# ML-Enhanced Honeypot System
+# ML-Enhanced Honeypot Alert System v2.1
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)
@@ -6,317 +6,256 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 
-A production-grade, multi-port honeypot with real-time machine learning attack classification,
-threat scoring, anomaly detection, attacker profiling, automated tiered response actions,
-and a live Next.js analytics dashboard.
+A production-grade security alert system with multi-port honeypot capabilities, real-time machine learning attack classification, enhanced threat intelligence, and automated incident response.
 
-Runs as a **system service** on Windows, Linux, and macOS — auto-starts on boot.
+Delivers comprehensive email alerts with attacker geolocation, network intelligence, security flagging, and behavioral profiling. Runs as a system service on Windows, Linux, and macOS.
 
 ---
 
-## Architecture
+## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      honeypot.py (v2.0)                     │
-│  50+ TCP ports  +  UDP (DNS/SNMP/TFTP)                      │
-│                                                             │
-│  ┌──────────────┐   ┌──────────────┐   ┌────────────────┐  │
-│  │ Payload      │→  │  ML Pipeline │→  │ Tiered Response│  │
-│  │ Capture      │   │  (real-time) │   │  Tier 1/2/3    │  │
-│  └──────────────┘   └──────────────┘   └────────────────┘  │
-│         ↓                   ↓                    ↓          │
-│   honeypot.log        ioc_export.json      iptables / fail2ban
-└─────────────────────────────────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────────────────────────────┐
-│             Next.js Dashboard (port 3000)                   │
-│  Timeline · Severity · ML Charts · Map · Live Feed · IOC   │
-└─────────────────────────────────────────────────────────────┘
+                              ┌──────────────────────────────────────┐
+                              │         ATTACKER (Internet)          │
+                              └──────────────┬───────────────────────┘
+                                             │
+                              ┌──────────────▼───────────────────────┐
+                              │      50+ Honeypot Ports (TCP/UDP)    │
+                              │   SSH  FTP  HTTP  SMB  RDP  MySQL... │
+                              └──────────────┬───────────────────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+          ┌─────────▼─────────┐    ┌─────────▼─────────┐    ┌────────▼────────┐
+          │  Payload Capture  │    │   ML Pipeline     │    │  Attacker Info  │
+          │  - Keystrokes     │    │   - Classification│    │  - Geolocation  │
+          │  - Commands       │    │   - Threat Score  │    │  - ISP/ASN      │
+          │  - File Transfers │    │   - Anomaly Detect│    │  - Proxy/VPN    │
+          └─────────┬─────────┘    └─────────┬─────────┘    └────────┬────────┘
+                    │                        │                        │
+                    └────────────────────────┼────────────────────────┘
+                                             │
+                              ┌──────────────▼───────────────────────┐
+                              │         Tiered Response              │
+                              │  Tier 1: Log + Notify + Email        │
+                              │  Tier 2: Block + Report + IOC        │
+                              │  Tier 3: Fail2ban + Geo-block        │
+                              └──────────────┬───────────────────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+          ┌─────────▼─────────┐    ┌─────────▼─────────┐    ┌────────▼────────┐
+          │   honeypot.log    │    │  ioc_export.json  │    │ blocked_ips.txt │
+          │   (JSONL events)  │    │  (Threat Intel)   │    │ (Firewall rules)│
+          └─────────┬─────────┘    └─────────┬─────────┘    └─────────────────┘
+                    │                        │
+                    └────────────────────────┼────────────────────────┐
+                                             │
+                              ┌──────────────▼───────────────────────┐
+                              │      Next.js Analytics Dashboard     │
+                              │   - Live Attack Feed                 │
+                              │   - World Attack Map                 │
+                              │   - ML Classification Charts         │
+                              │   - Attacker Profiles                │
+                              │   - IOC Export                       │
+                              └──────────────────────────────────────┘
 ```
 
 ---
 
-## Features
+## Capabilities
 
-### Honeypot (50+ ports)
-- TCP: SSH, Telnet, FTP, SMTP, HTTP, HTTPS, SMB, RDP, MySQL, PostgreSQL, Redis, MongoDB, VNC, MSSQL, LDAP, and 35+ more
-- UDP: DNS (53), SNMP (161/162), TFTP (69)
-- Realistic fake banners per service
+### Honeypot Engine
+- **TCP Services**: SSH, Telnet, FTP, SMTP, HTTP, HTTPS, SMB, RDP, MySQL, PostgreSQL, Redis, MongoDB, VNC, MSSQL, LDAP, and 35+ more
+- **UDP Services**: DNS (53), SNMP (161/162), TFTP (69)
+- Realistic service banners per port
 - Payload capture with hex/text decode
-- IP watchlist + repeat-offender tracking
-- Blocked-IP list loaded on startup (silently drops known-bad IPs)
+- IP watchlist and repeat-offender tracking
+- Automatic blocked-IP list on startup
 
-### Machine Learning (real-time)
+### Threat Intelligence
+- **Multi-API Geolocation** — ipapi.co, ip-api.com, ipinfo.io with automatic fallback
+- **Location Data** — City, country, continent, coordinates, timezone, postal code
+- **Network Intelligence** — ISP, ASN, organization, connection type, reverse DNS
+- **Security Detection** — Proxy, VPN, Tor exit node, hosting/datacenter identification
+- **Attacker History** — Return visitor tracking, total attacks, persistence scoring
+
+### Machine Learning Analysis
 | Model | Algorithm | Metric |
 |-------|-----------|--------|
 | Attack Classification | Random Forest | 100% accuracy |
-| Anomaly Detection | Isolation Forest | — |
+| Anomaly Detection | Isolation Forest | Contamination: 0.1 |
 | Threat Scoring | Gradient Boosting Regressor | MAE 0.013 |
 | Attacker Profiling | K-Means Clustering | 5 profiles |
 
-### Tiered Response
+### Automated Response
 | Tier | Trigger | Actions |
 |------|---------|---------|
-| 1 | Any hit | Log + desktop notification + email alert |
-| 2 | Score ≥ 6 OR 5+ hits | iptables block + AbuseIPDB report + IOC file write |
-| 3 | Score ≥ 8 OR (anomaly + score ≥ 6) | fail2ban log + enriched critical email + geo-block recommendation |
+| 1 | Any detection | Log + desktop notification + email alert |
+| 2 | Score >= 6 OR 5+ hits | iptables block + AbuseIPDB report + IOC export |
+| 3 | Score >= 8 OR anomaly + score >= 6 | fail2ban integration + critical email + geo-block analysis |
 
-### Analytics Dashboard
-- 6 stat cards: Total Attacks, Unique Attackers, Blocked IPs, Avg Threat Score, Critical Hits, Anomalies
-- Area chart timeline (last 24 h, 10-min buckets)
-- Severity breakdown, ML Attack Classification, Attacker Profiles donut
-- Leaflet world attack map
-- Live feed table with click-to-expand detail panel
-- Export IOC button → downloads `ioc_export_YYYY-MM-DD.json`
+### Email Alert System
+- **Dual Format** — Professional HTML and plain text versions
+- **Attacker Intelligence** — Full geolocation, network, and ISP details
+- **Security Indicators** — Tor/VPN/Proxy/Hosting flags with risk scores
+- **Behavioral Analysis** — Repeat offender detection with persistence metrics
+- **ML Results** — Attack type classification, threat score, severity level
+- **Evidence** — Captured payload and commands included
+
+### Web Dashboard
+- **Real-time Monitoring** — Live attack feed with auto-refresh (5s)
+- **Geographic Visualization** — Leaflet world map with attack markers
+- **Analytics** — Timeline charts, severity distribution, attack classification
+- **Attacker Profiles** — ML-generated behavioral clusters
+- **Export Capabilities** — IOC download in JSON format
+- **Status Indicators** — Online/offline status, notifications, system health
 
 ---
 
 ## Requirements
 
-| Tool | Version |
-|------|---------|
+| Component | Version |
+|-----------|---------|
 | Python | 3.10+ |
 | Node.js | 18+ LTS |
 
-The installers auto-download these via `winget` (Windows), `apt`/`brew` (Linux/macOS).
+Dependencies auto-install via `winget` (Windows), `apt`/`brew` (Linux/macOS).
 
 ---
 
 ## Installation
 
-### Linux (Ubuntu / Debian) — systemd service
+### Linux (Ubuntu/Debian)
 
 ```bash
-# Clone or extract the package
 git clone https://github.com/your-username/honeypot.git
 cd honeypot
-
-# Run the installer as root
 sudo bash install.sh
 ```
 
-The installer:
-1. Installs Python 3 and Node.js 20 (via `apt` + NodeSource) if missing
-2. Installs Python packages: `scikit-learn numpy requests python-dotenv`
-3. Copies files to `/opt/honeypot/`
-4. Creates `/opt/honeypot/.env` from template (edit it — see Configuration)
-5. Trains ML models
-6. Registers and starts two **systemd** services:
-   - `honeypot` — the multi-port trap (auto-starts on boot)
-   - `honeypot-dashboard` — the Next.js web dashboard on port 3000
+**Installer performs:**
+1. Python 3 and Node.js 20 installation (if missing)
+2. Python packages: `scikit-learn numpy requests python-dotenv`
+3. File deployment to `/opt/honeypot/`
+4. Environment configuration via `/opt/honeypot/.env`
+5. ML model training
+6. systemd service registration:
+   - `honeypot` — Core detection service (auto-start on boot)
+   - `honeypot-dashboard` — Web interface on port 3000
 
-**Service management:**
+**Service Management:**
 ```bash
-sudo systemctl status  honeypot
+sudo systemctl status honeypot
 sudo systemctl restart honeypot
-sudo systemctl stop    honeypot
-sudo journalctl -u honeypot -f          # live logs
-
-sudo systemctl status  honeypot-dashboard
-sudo journalctl -u honeypot-dashboard -f
+sudo journalctl -u honeypot -f
 ```
 
-**Skip service registration (manual start):**
-```bash
-sudo bash install.sh --no-service
-
-# Then start manually:
-sudo PYTHONPATH=/opt/honeypot python3 /opt/honeypot/honeypot.py &
-cd /opt/honeypot/honeypot-analytics && npm run start
-```
-
----
-
-### macOS — launchd agent
+### macOS
 
 ```bash
-# Homebrew and Xcode CLI tools must be installed, or the script installs them
 cd honeypot-package
 bash install.sh
 ```
 
-The installer:
-1. Installs Python 3.11 and Node.js 20 via Homebrew if missing
-2. Copies files to `~/honeypot/`
-3. Creates `~/honeypot/.env` from template
-4. Trains ML models
-5. Registers two **launchd** agents (auto-start on login):
-   - `com.honeypot` — honeypot daemon
-   - `com.honeypot.dashboard` — Next.js dashboard on port 3000
+Registers launchd agents for automatic startup. Note: Ports below 1024 require elevated privileges.
 
-> **Note:** macOS requires root (`sudo`) to bind ports below 1024 (SSH:22, HTTP:80, etc.).
-> The launchd agent runs under your user by default. For privileged ports, move the plists
-> to `/Library/LaunchDaemons/` and run the installer as root.
-
-**Service management:**
-```bash
-launchctl stop  com.honeypot
-launchctl start com.honeypot
-tail -f ~/honeypot/honeypot-stdout.log    # live log
-
-launchctl stop  com.honeypot.dashboard
-launchctl start com.honeypot.dashboard
-tail -f ~/honeypot/dashboard-stdout.log
-```
-
----
-
-### Windows — Windows Service (NSSM)
-
-Open **PowerShell as Administrator** and run:
+### Windows
 
 ```powershell
+# Run PowerShell as Administrator
 cd honeypot-package
 .\install.ps1
 ```
 
-The installer:
-1. Auto-installs Python 3.11 and Node.js LTS via `winget` if missing
-2. Installs Python packages
-3. Copies files to `C:\honeypot\`
-4. Opens `C:\honeypot\.env` in Notepad for you to fill in credentials
-5. Trains ML models
-6. Downloads **NSSM** and registers two Windows services:
-   - `honeypot` — starts automatically at boot
-   - `honeypot-dashboard` — Next.js dashboard on port 3000
-
-**Custom install path or port:**
-```powershell
-.\install.ps1 -InstallDir "D:\security\honeypot" -DashboardPort 8080
-```
-
-**Skip service registration:**
-```powershell
-.\install.ps1 -NoService
-```
-
-**Service management:**
+Registers Windows Services via NSSM. Manage via `services.msc` or PowerShell:
 ```powershell
 Get-Service honeypot, honeypot-dashboard
 Restart-Service honeypot
-Stop-Service honeypot
-Get-Content C:\honeypot\honeypot-stdout.log -Wait   # live log
 ```
-Or open `services.msc` and look for **honeypot** / **honeypot-dashboard**.
+
+### Manual Start (All Platforms)
+
+```bash
+# Terminal 1 - Honeypot
+pip3 install scikit-learn numpy requests python-dotenv
+PYTHONPATH=./honeypot python3 honeypot/honeypot.py
+
+# Terminal 2 - Dashboard
+cd honeypot-analytics && npm install && npm run dev
+# Access: http://localhost:3000
+```
 
 ---
 
-### Desktop / Developer (any OS — no service)
+## Configuration
 
-```bash
-# Linux / macOS — manual start
-cd honeypot-package
-pip3 install scikit-learn numpy requests python-dotenv
-PYTHONPATH=$(pwd)/honeypot python3 honeypot/ml/ml_pipeline.py train honeypot/data/honeypot_synthetic.json
-sudo PYTHONPATH=$(pwd)/honeypot python3 honeypot/honeypot.py
+Edit `.env` in the honeypot directory:
 
-# Dashboard (separate terminal)
-cd honeypot-analytics && npm install && npm run dev
-# Open http://localhost:3000
+```env
+# Email Alerts (Required)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SENDER_EMAIL=your_email@gmail.com
+SENDER_PASSWORD=your_app_password
+RECIPIENT_EMAIL=your_email@gmail.com
+
+# Optional: AbuseIPDB Reporting
+ABUSEIPDB_API_KEY=your_api_key
+
+# Alert Throttling
+EMAIL_THROTTLE_SECONDS=300
+EMAIL_MAX_PER_HOUR=20
+
+# System
+MAX_HANDLER_THREADS=50
+HONEYPOT_LOG_FILE=./honeypot.log
 ```
 
-```batch
-:: Windows CMD (run as Administrator)
-cd honeypot-package
-SETUP.bat
-honeypot\start_honeypot.bat
-start_dashboard.bat
-```
+**Gmail App Password:** https://support.google.com/accounts/answer/185833
 
 ---
 
 ## Uninstall
 
-**Linux / macOS:**
+**Linux/macOS:**
 ```bash
 sudo bash uninstall.sh
 ```
 
-**Windows (PowerShell as Administrator):**
+**Windows:**
 ```powershell
 .\uninstall.ps1
-# Keep files but remove services only:
+# Remove services only, keep files:
 .\uninstall.ps1 -KeepFiles
 ```
 
 ---
 
-## Configuration (`honeypot/.env` or `C:\honeypot\.env` or `/opt/honeypot/.env`)
+## Output Files
 
-```env
-# Email alerts
-SENDER_EMAIL=you@gmail.com
-RECIPIENT_EMAIL=you@gmail.com
-SENDER_PASSWORD=xxxx-xxxx-xxxx-xxxx   # Gmail App Password
-
-# Optional — AbuseIPDB auto-reporting (Tier 2)
-ABUSEIPDB_API_KEY=your_key_here
-
-# Dashboard log path override (set automatically by installer)
-# HONEYPOT_LOG_FILE=/opt/honeypot/honeypot.log
-
-# Throttle / concurrency
-EMAIL_THROTTLE_SECONDS=300
-EMAIL_MAX_PER_HOUR=20
-MAX_HANDLER_THREADS=50
-```
-
-Get a Gmail App Password: https://support.google.com/accounts/answer/185833
+| File | Purpose |
+|------|---------|
+| `honeypot.log` | JSONL-formatted attack events |
+| `ioc_export.json` | Threat intelligence indicators |
+| `blocked_ips.txt` | Firewall-blocked IP addresses |
+| `fail2ban_manual.log` | Critical attacker records |
+| `attacker_history.json` | Behavioral profiles and history |
 
 ---
 
-## File Structure
+## Operational Notes
 
-```
-honeypot-package/
-├── install.sh                       ← Linux + macOS installer (systemd / launchd)
-├── install.ps1                      ← Windows installer (NSSM service)
-├── uninstall.sh                     ← Linux + macOS uninstaller
-├── uninstall.ps1                    ← Windows uninstaller
-├── SETUP.bat                        ← Windows quick-setup (no service)
-├── start_dashboard.bat              ← Start web dashboard (Windows)
-├── README.md
-│
-├── honeypot/
-│   ├── honeypot.py                  ← Main honeypot v2.0 (ML + tiers)
-│   ├── config.py                    ← Shared paths / settings
-│   ├── analytics.py                 ← Terminal dashboard
-│   ├── .env.example                 ← Config template
-│   ├── start_honeypot.bat
-│   ├── train_ml.bat
-│   ├── analytics_dashboard.bat
-│   ├── ml/
-│   │   ├── ml_pipeline.py           ← HoneypotML (train + infer)
-│   │   └── synthetic_data_generator.py
-│   ├── data/
-│   │   └── honeypot_synthetic.json  ← 5 000 training samples
-│   └── models/                      ← Trained .pkl model files
-│
-└── honeypot-analytics/              ← Next.js web dashboard
-    └── src/app/
-        ├── page.tsx                 ← Full ML dashboard UI
-        └── api/analytics/route.ts  ← Log parser + ML aggregations
-```
+- **Privileged Ports**: Binding ports below 1024 requires root/Administrator
+- **Port Conflicts**: In-use ports are automatically skipped
+- **ML Models**: Pre-trained; retrain with `python ml/ml_pipeline.py train data/honeypot_synthetic.json`
+- **AbuseIPDB**: Optional; leave `ABUSEIPDB_API_KEY` empty to disable
+- **Firewall Integration**: iptables (Tier 2) Linux-only; Windows/macOS log only
 
 ---
 
-## Runtime Files
+## Support
 
-| File | Description |
-|------|-------------|
-| `honeypot.log` | JSONL attack log (one event per line) |
-| `ioc_export.json` | IOC list — exported by dashboard or Tier 2 |
-| `blocked_ips.txt` | IPs blocked by iptables (Tier 2, Linux) |
-| `fail2ban_manual.log` | Critical attacker log for fail2ban (Tier 3) |
-| `geo_block_recommendations.txt` | Countries flagged for geo-blocking |
+For issues, configuration assistance, or feature requests, please open an issue on the project repository.
 
----
-
-## Notes
-
-- Binding ports below 1024 (SSH:22, HTTP:80, etc.) requires **root / Administrator**
-- Ports already in use on the host are skipped automatically
-- ML models are pre-trained. Re-train anytime: `python ml/ml_pipeline.py train data/honeypot_synthetic.json`
-- AbuseIPDB reporting is optional — leave `ABUSEIPDB_API_KEY` blank to skip
-- iptables blocking (Tier 2) only works on Linux; Windows/macOS log the block intent without applying firewall rules
+**License:** MIT

@@ -52,6 +52,9 @@ from config import (
     validate_email_config,
 )
 
+# ── Enhanced Attacker Intelligence ─────────────────────────────────────────────
+from intelligence.attacker_info import get_attacker_info_singleton
+
 # ── Optional AbuseIPDB reporting ───────────────────────────────────────────────
 ABUSEIPDB_API_KEY   = os.getenv("ABUSEIPDB_API_KEY", "")
 ABUSEIPDB_ENABLED   = bool(ABUSEIPDB_API_KEY)
@@ -146,47 +149,473 @@ def _can_send_email(attacker_ip: str) -> bool:
         return True
 
 
+def _format_email_body(
+    attacker_ip: str,
+    port: int,
+    service: str,
+    info: dict,
+    threat_score: float,
+    severity: str,
+    attack_type: str,
+    hit_count: int,
+    payload_decoded: str = "",
+) -> str:
+    """Format enhanced email alert body with comprehensive attacker information."""
+    
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+    
+    # Build security flags section
+    security_flags = []
+    if info.get("is_tor"):
+        security_flags.append("Tor Exit Node")
+    if info.get("is_vpn"):
+        security_flags.append("VPN Provider")
+    if info.get("is_proxy"):
+        security_flags.append("Proxy Detected")
+    if info.get("is_hosting"):
+        security_flags.append("Hosting/Datacenter")
+    if info.get("attacker_profile", {}).get("is_returning"):
+        security_flags.append("Repeat Offender")
+    
+    security_section = ""
+    if security_flags:
+        security_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SECURITY FLAGS                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  {'  |  '.join(security_flags):<68} │
+│  Risk Score: {info.get('proxy_risk_score', 0)}/100{' ' * 55} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build attacker profile section
+    profile = info.get("attacker_profile", {})
+    profile_section = ""
+    if profile.get("is_returning"):
+        profile_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ATTACKER HISTORY                                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  First Seen:     {profile.get('first_seen', 'N/A'):<52} │
+│  Last Seen:      {profile.get('last_seen', 'N/A'):<52} │
+│  Total Attacks:  {str(profile.get('total_attacks', 0)):<52} │
+│  Attacks/Day:    {str(profile.get('attacks_per_day', 0)):<52} │
+│  Persistence:    {f"{profile.get('persistence_score', 0):.1f}/10":<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build location section
+    location_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LOCATION INFORMATION                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  City:           {f"{info.get('city', 'Unknown')}, {info.get('region', '')}".strip():<52} │
+│  Country:        {f"{info.get('country', 'Unknown')} ({info.get('country_code', '')})".strip():<52} │
+│  Continent:      {info.get('continent', 'Unknown'):<52} │
+│  Coordinates:    {f"{info.get('lat', 0):.4f}, {info.get('lon', 0):.4f}":<52} │
+│  Postal:         {info.get('postal', 'Unknown'):<52} │
+│  Timezone:       {info.get('timezone', 'Unknown'):<52} │
+│  UTC Offset:     {info.get('utc_offset', 'Unknown'):<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build network section
+    network_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  NETWORK INFORMATION                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ISP:            {info.get('isp', 'Unknown'):<52} │
+│  ASN:            {info.get('asn', 'Unknown'):<52} │
+│  Organization:   {info.get('org', 'Unknown'):<52} │
+│  Connection:     {info.get('connection_type', 'Unknown'):<52} │
+│  Reverse DNS:    {info.get('reverse_dns', 'Unknown'):<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build supplemental section
+    supplemental_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SUPPLEMENTAL DATA                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Currency:       {info.get('currency', 'Unknown'):<52} │
+│  Languages:      {info.get('languages', 'Unknown'):<52} │
+│  Calling Code:   {info.get('calling_code', 'Unknown'):<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build threat indicators section
+    indicators = info.get("threat_indicators", [])
+    indicators_section = ""
+    if indicators:
+        indicators_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  THREAT INDICATORS                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  {'  |  '.join(indicators):<68} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build payload section
+    payload_section = ""
+    if payload_decoded and payload_decoded.strip():
+        payload_preview = payload_decoded[:400].replace("\n", "\\n")
+        if len(payload_decoded) > 400:
+            payload_preview += "... (truncated)"
+        payload_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CAPTURED PAYLOAD                                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  {payload_preview:<68} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Build ML analysis section
+    ml_section = f"""
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ML ANALYSIS                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Attack Type:    {attack_type:<52} │
+│  Threat Score:   {f"{threat_score:.1f}/10":<52} │
+│  Severity:       {severity:<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+"""
+    
+    # Combine all sections
+    body = f"""
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                                                                             ║
+║     HONEYPOT SECURITY ALERT                                                 ║
+║                                                                             ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ALERT SUMMARY                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Attacker IP:    {attacker_ip:<52} │
+│  Target Service: {service:<52} │
+│  Target Port:    {str(port):<52} │
+│  Hit Count:      {str(hit_count):<52} │
+│  Timestamp:      {now:<52} │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+{security_section}{profile_section}{location_section}{network_section}{supplemental_section}{indicators_section}{ml_section}{payload_section}
+═══════════════════════════════════════════════════════════════════════════════
+
+  This is an automated alert from Honeypot v2.1
+  View dashboard: http://localhost:3000
+  Log file: {LOG_FILE}
+
+═══════════════════════════════════════════════════════════════════════════════
+"""
+    
+    return body
+
+
+def _format_email_html(
+    attacker_ip: str,
+    port: int,
+    service: str,
+    info: dict,
+    threat_score: float,
+    severity: str,
+    attack_type: str,
+    hit_count: int,
+    payload_decoded: str = "",
+) -> str:
+    """Format HTML email alert with comprehensive attacker information."""
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+    # Severity color
+    severity_colors = {
+        "CRITICAL": "#ef4444",
+        "HIGH": "#f97316",
+        "MEDIUM": "#eab308",
+        "LOW": "#22c55e",
+        "INFO": "#6b7280",
+    }
+    severity_color = severity_colors.get(severity, "#6b7280")
+
+    # Security flags HTML
+    security_flags_html = ""
+    if info.get("is_tor"):
+        security_flags_html += '<span style="background:#fee2e2;color:#dc2626;padding:4px 8px;border-radius:4px;margin:2px;display:inline-block;">Tor Exit Node</span>'
+    if info.get("is_vpn"):
+        security_flags_html += '<span style="background:#ffedd5;color:#ea580c;padding:4px 8px;border-radius:4px;margin:2px;display:inline-block;">VPN Provider</span>'
+    if info.get("is_proxy"):
+        security_flags_html += '<span style="background:#fef3c7;color:#ca8a04;padding:4px 8px;border-radius:4px;margin:2px;display:inline-block;">Proxy Detected</span>'
+    if info.get("is_hosting"):
+        security_flags_html += '<span style="background:#dbeafe;color:#2563eb;padding:4px 8px;border-radius:4px;margin:2px;display:inline-block;">Hosting/Datacenter</span>'
+    if info.get("attacker_profile", {}).get("is_returning"):
+        security_flags_html += '<span style="background:#f3e8ff;color:#9333ea;padding:4px 8px;border-radius:4px;margin:2px;display:inline-block;">Repeat Offender</span>'
+
+    security_section_html = ""
+    if security_flags_html:
+        security_section_html = f"""
+        <tr>
+            <td colspan="2" style="padding:16px;background:#fef2f2;border:1px solid #fecaca;">
+                <strong style="color:#dc2626;">Security Flags:</strong><br>
+                <div style="margin-top:8px;">{security_flags_html}</div>
+                <div style="margin-top:8px;color:#6b7280;font-size:12px;">Risk Score: {info.get('proxy_risk_score', 0)}/100</div>
+            </td>
+        </tr>
+"""
+
+    # Attacker profile HTML
+    profile = info.get("attacker_profile", {})
+    profile_section_html = ""
+    if profile.get("is_returning"):
+        profile_section_html = f"""
+        <tr>
+            <td colspan="2" style="padding:16px;background:#f5f3ff;border:1px solid #e9d5ff;">
+                <strong style="color:#9333ea;">Attacker History:</strong>
+                <table style="width:100%;margin-top:8px;font-size:13px;">
+                    <tr><td style="padding:4px 0;color:#6b7280;">First Seen:</td><td style="padding:4px 0;">{profile.get('first_seen', 'N/A')}</td></tr>
+                    <tr><td style="padding:4px 0;color:#6b7280;">Last Seen:</td><td style="padding:4px 0;">{profile.get('last_seen', 'N/A')}</td></tr>
+                    <tr><td style="padding:4px 0;color:#6b7280;">Total Attacks:</td><td style="padding:4px 0;">{profile.get('total_attacks', 0)}</td></tr>
+                    <tr><td style="padding:4px 0;color:#6b7280;">Attacks/Day:</td><td style="padding:4px 0;">{profile.get('attacks_per_day', 0):.2f}</td></tr>
+                    <tr><td style="padding:4px 0;color:#6b7280;">Persistence:</td><td style="padding:4px 0;">{profile.get('persistence_score', 0):.1f}/10</td></tr>
+                </table>
+            </td>
+        </tr>
+"""
+
+    # Payload HTML
+    payload_html = ""
+    if payload_decoded and payload_decoded.strip():
+        payload_preview = payload_decoded[:500]
+        if len(payload_decoded) > 500:
+            payload_preview += "... (truncated)"
+        payload_html = f"""
+        <tr>
+            <td colspan="2" style="padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;">
+                <strong style="color:#16a34a;">Captured Payload:</strong>
+                <pre style="background:#1f2937;color:#4ade80;padding:12px;border-radius:4px;overflow-x:auto;font-size:11px;margin-top:8px;">{payload_preview}</pre>
+            </td>
+        </tr>
+"""
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; margin:0; padding:20px; background:#f9fafb; }}
+        .container {{ max-width:800px; margin:0 auto; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 4px 6px rgba(0,0,0,0.1); }}
+        .header {{ background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color:#ffffff; padding:24px; text-align:center; }}
+        .header h1 {{ margin:0; font-size:24px; }}
+        .content {{ padding:24px; }}
+        .section {{ margin-bottom:24px; }}
+        .section-title {{ color:#1f2937; font-size:16px; font-weight:600; margin-bottom:12px; border-bottom:2px solid #e5e7eb; padding-bottom:8px; }}
+        .info-grid {{ display:grid; grid-template-columns:140px 1fr; gap:8px; font-size:14px; }}
+        .info-label {{ color:#6b7280; font-weight:500; }}
+        .info-value {{ color:#1f2937; font-family:monospace; }}
+        .footer {{ background:#f3f4f6; padding:16px; text-align:center; font-size:12px; color:#6b7280; }}
+        .severity-badge {{ display:inline-block; padding:4px 12px; border-radius:4px; color:#ffffff; font-weight:600; font-size:12px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Honeypot Security Alert</h1>
+            <p style="margin:8px 0 0 0; opacity:0.9;">{now}</p>
+        </div>
+
+        <div class="content">
+            <!-- Alert Summary -->
+            <div class="section">
+                <div class="section-title">Alert Summary</div>
+                <div class="info-grid">
+                    <span class="info-label">Attacker IP:</span>
+                    <span class="info-value" style="font-size:16px;font-weight:600;">{attacker_ip}</span>
+
+                    <span class="info-label">Target Service:</span>
+                    <span class="info-value">{service}</span>
+
+                    <span class="info-label">Target Port:</span>
+                    <span class="info-value">{port}</span>
+
+                    <span class="info-label">Hit Count:</span>
+                    <span class="info-value">{hit_count}</span>
+
+                    <span class="info-label">Severity:</span>
+                    <span class="severity-badge" style="background:{severity_color};">{severity}</span>
+                </div>
+            </div>
+
+            {security_section_html}
+            {profile_section_html}
+
+            <!-- Location -->
+            <div class="section">
+                <div class="section-title">Location Information</div>
+                <div class="info-grid">
+                    <span class="info-label">City:</span>
+                    <span class="info-value">{info.get('city', 'Unknown')}, {info.get('region', '')}</span>
+
+                    <span class="info-label">Country:</span>
+                    <span class="info-value">{info.get('country', 'Unknown')} ({info.get('country_code', '')})</span>
+
+                    <span class="info-label">Continent:</span>
+                    <span class="info-value">{info.get('continent', 'Unknown')}</span>
+                    
+                    <span class="info-label">Coordinates:</span>
+                    <span class="info-value">{info.get('lat', 0):.4f}, {info.get('lon', 0):.4f}</span>
+                    
+                    <span class="info-label">Timezone:</span>
+                    <span class="info-value">{info.get('timezone', 'Unknown')}</span>
+                </div>
+            </div>
+
+            <!-- Network -->
+            <div class="section">
+                <div class="section-title">Network Information</div>
+                <div class="info-grid">
+                    <span class="info-label">ISP:</span>
+                    <span class="info-value">{info.get('isp', 'Unknown')}</span>
+
+                    <span class="info-label">ASN:</span>
+                    <span class="info-value">{info.get('asn', 'Unknown')}</span>
+
+                    <span class="info-label">Organization:</span>
+                    <span class="info-value">{info.get('org', 'Unknown')}</span>
+
+                    <span class="info-label">Connection Type:</span>
+                    <span class="info-value">{info.get('connection_type', 'Unknown')}</span>
+
+                    <span class="info-label">Reverse DNS:</span>
+                    <span class="info-value">{info.get('reverse_dns', 'Unknown')}</span>
+                </div>
+            </div>
+
+            <!-- Supplemental -->
+            <div class="section">
+                <div class="section-title">Supplemental Data</div>
+                <div class="info-grid">
+                    <span class="info-label">Currency:</span>
+                    <span class="info-value">{info.get('currency', 'Unknown')}</span>
+
+                    <span class="info-label">Languages:</span>
+                    <span class="info-value">{info.get('languages', 'Unknown')}</span>
+
+                    <span class="info-label">Calling Code:</span>
+                    <span class="info-value">{info.get('calling_code', 'Unknown')}</span>
+                </div>
+            </div>
+
+            <!-- ML Analysis -->
+            <div class="section">
+                <div class="section-title">ML Analysis</div>
+                <div class="info-grid">
+                    <span class="info-label">Attack Type:</span>
+                    <span class="info-value">{attack_type}</span>
+
+                    <span class="info-label">Threat Score:</span>
+                    <span class="info-value">{threat_score:.1f}/10</span>
+                </div>
+            </div>
+
+            <!-- Threat Indicators -->
+            {f'<div class="section"><div class="section-title">Threat Indicators</div><div style="color:#dc2626;">' + ', '.join(info.get('threat_indicators', [])) + '</div></div>' if info.get('threat_indicators') else ''}
+
+            {payload_html}
+
+        </div>
+
+        <div class="footer">
+            <p>Automated alert from <strong>Honeypot v2.1</strong></p>
+            <p>View dashboard: <a href="http://localhost:3000" style="color:#2563eb;">http://localhost:3000</a></p>
+            <p style="margin-top:12px;font-size:11px;color:#9ca3af;">This is an automated security alert. Please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    
+    return html
+
+
 def send_email_alert(
     attacker_ip: str,
     port: int,
     service: str,
-    details: str,
-    subject_prefix: str = "[ALERT]",
+    info: dict,
+    threat_score: float,
+    severity: str,
+    attack_type: str,
+    hit_count: int,
+    payload_decoded: str = "",
 ) -> None:
+    """
+    Send comprehensive email alert with enhanced attacker information.
+    
+    Args:
+        attacker_ip: Source IP address
+        port: Target port number
+        service: Target service name
+        info: Enhanced attacker info dict (from get_attacker_info)
+        threat_score: ML threat score (0-10)
+        severity: Severity level (CRITICAL/HIGH/MEDIUM/LOW/INFO)
+        attack_type: ML-predicted attack type
+        hit_count: Number of hits from this IP
+        payload_decoded: Captured payload text
+    """
     if not _can_send_email(attacker_ip):
         logging.debug(f"Email suppressed for {attacker_ip} (throttled)")
         return
     if validate_email_config():
+        logging.warning("Email configuration incomplete - cannot send alert")
         return
+    
     try:
-        msg            = MIMEMultipart()
-        msg["From"]    = EMAIL_CONFIG["sender_email"]
-        msg["To"]      = EMAIL_CONFIG["recipient_email"]
-        msg["Subject"] = f"{subject_prefix} HONEYPOT: {service} port {port} ← {attacker_ip}"
-        body = (
-            f"HONEYPOT TRIGGERED\n{'='*60}\n\n"
-            f"Service:     {service}\nPort:        {port}\n"
-            f"Attacker IP: {attacker_ip}\n"
-            f"Time:        {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            f"Details:\n{details}\n\n---\nHoneyPot v2.0"
+        msg = MIMEMultipart("alternative")
+        msg["From"] = EMAIL_CONFIG["sender_email"]
+        msg["To"] = EMAIL_CONFIG["recipient_email"]
+        msg["Subject"] = f"[{severity}] HONEYPOT ALERT: {service} Attack from {attacker_ip} ({info.get('city', 'Unknown')}, {info.get('country', 'Unknown')})"
+        
+        # Create plain text and HTML versions
+        plain_body = _format_email_body(
+            attacker_ip, port, service, info, threat_score, severity, attack_type, hit_count, payload_decoded
         )
-        msg.attach(MIMEText(body, "plain"))
-        if LOG_FILE.exists():
+        html_body = _format_email_html(
+            attacker_ip, port, service, info, threat_score, severity, attack_type, hit_count, payload_decoded
+        )
+        
+        # Attach both versions
+        msg.attach(MIMEText(plain_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+        
+        # Attach log file (optional - comment out if too large)
+        if LOG_FILE.exists() and LOG_FILE.stat().st_size < 5 * 1024 * 1024:  # Max 5MB
             try:
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(LOG_FILE.read_bytes())
                 encoders.encode_base64(part)
                 part.add_header("Content-Disposition", "attachment; filename=honeypot.log")
                 msg.attach(part)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.debug(f"Failed to attach log file: {e}")
+        
+        # Send email
         with smtplib.SMTP(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"]) as srv:
             srv.starttls()
             srv.login(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["sender_password"])
             srv.sendmail(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["recipient_email"], msg.as_string())
-        logging.info(f"Email alert sent for {attacker_ip}:{port}")
+        
+        logging.info(f"Email alert sent for {attacker_ip}:{port} [{severity}]")
+    
     except Exception as exc:
-        logging.error(f"Failed to send email: {exc}")
+        logging.error(f"Failed to send email alert: {exc}")
 
 
 def send_desktop_notification(
@@ -213,62 +642,37 @@ def send_desktop_notification(
 
 # ── Attacker intelligence ──────────────────────────────────────────────────────
 
-def get_attacker_info(ip: str, port: int = 0) -> dict:
-    info: dict = {
-        "ip":               ip,
-        "timestamp":        datetime.now().isoformat(),
-        "country":          "Unknown",
-        "city":             "Unknown",
-        "isp":              "Unknown",
-        "asn":              "Unknown",
-        "org":              "Unknown",
-        "reverse_dns":      "Unknown",
-        "lat":              0,
-        "lon":              0,
-        "attack_signature": ATTACK_SIGNATURES.get(port, "Unknown attack vector"),
-        "threat_indicators": [],
-    }
-    if ip in ("127.0.0.1", "::1", "localhost"):
-        info.update({"country": "Localhost", "city": "Local", "isp": "Local"})
-        return info
-
-    try:
-        info["reverse_dns"] = socket.gethostbyaddr(ip)[0]
-    except Exception:
-        info["reverse_dns"] = "No reverse DNS"
-
-    try:
-        result = subprocess.run(["whois", ip], capture_output=True, text=True, timeout=10)
-        whois  = result.stdout or ""
-        info["whois"] = whois[:3000]
-        for line in whois.splitlines():
-            for key, tag in [("asn", "OriginAS:"), ("country", "Country:"),
-                              ("city", "City:"),    ("org", "OrgName:")]:
-                if tag in line:
-                    info[key] = line.split(":", 1)[1].strip()
-    except Exception:
-        info["whois"] = "Whois lookup failed"
-
-    try:
-        url = (f"http://ip-api.com/json/{ip}"
-               f"?fields=status,country,city,isp,as,org,timezone,lat,lon")
-        req = urllib.request.Request(url, headers={"User-Agent": "HoneypotMonitor/2.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            geo = json.loads(resp.read().decode())
-        if geo.get("status") == "success":
-            info.update({
-                "country":  geo.get("country",  info["country"]),
-                "city":     geo.get("city",     info["city"]),
-                "isp":      geo.get("isp",      info["isp"]),
-                "asn":      geo.get("as",       info["asn"]),
-                "org":      geo.get("org",      info["org"]),
-                "timezone": geo.get("timezone", "Unknown"),
-                "lat":      geo.get("lat",      0),
-                "lon":      geo.get("lon",      0),
-            })
-    except Exception:
-        pass
-
+def get_attacker_info(ip: str, port: int = 0, service: str = "Unknown") -> dict:
+    """
+    Get comprehensive attacker information using enhanced intelligence module.
+    
+    Returns dict with:
+    - Location: city, country, lat, lon, timezone, postal, continent
+    - Network: ISP, ASN, org, connection type, reverse DNS
+    - Security: proxy/VPN/Tor detection, risk score
+    - Supplemental: currency, languages, calling code
+    - History: attacker profile (returning visitor, total attacks, etc.)
+    """
+    # Use enhanced intelligence module
+    intel = get_attacker_info_singleton()
+    info = intel.get_info(ip, port, service)
+    
+    # Add attack signature
+    info["attack_signature"] = ATTACK_SIGNATURES.get(port, "Unknown attack vector")
+    info["threat_indicators"] = []
+    
+    # Add risk indicators
+    if info.get("is_tor"):
+        info["threat_indicators"].append("Tor exit node")
+    if info.get("is_vpn"):
+        info["threat_indicators"].append("VPN provider")
+    if info.get("is_proxy"):
+        info["threat_indicators"].append("Proxy detected")
+    if info.get("is_hosting"):
+        info["threat_indicators"].append("Hosting/datacenter IP")
+    if info["attacker_profile"].get("is_returning"):
+        info["threat_indicators"].append("Repeat offender")
+    
     return info
 
 
@@ -457,6 +861,7 @@ def take_action(event: dict, ml_result: dict, attacker_ip: str) -> None:
     info        = event.get("info", {})
     port        = event.get("honeypot_port", 0)
     service     = event.get("service", "Unknown")
+    payload     = event.get("payload_decoded", "")
 
     # Always write IOC
     write_ioc(event, ml_result)
@@ -464,22 +869,17 @@ def take_action(event: dict, ml_result: dict, attacker_ip: str) -> None:
     # Always send desktop notification
     send_desktop_notification(attacker_ip, service, port, info, severity)
 
-    details = (
-        f"Attack Type:      {attack_type}\n"
-        f"Threat Score:     {score}/10 ({severity})\n"
-        f"Anomaly:          {'YES — unusual pattern!' if anomaly else 'No'}\n"
-        f"Attacker Profile: {profile}\n"
-        f"Hit Count:        {hit_count} connections from this IP\n"
-        f"Payload:          {event.get('payload_decoded','(empty)')[:300]}\n"
-        f"Indicators:       {', '.join(info.get('threat_indicators', [])) or 'None'}\n\n"
-        f"Location:         {info.get('city')}, {info.get('country')}\n"
-        f"Coordinates:      {info.get('lat')}, {info.get('lon')}\n"
-        f"ISP:              {info.get('isp')}\n"
-        f"ASN:              {info.get('asn')}\n"
-        f"Org:              {info.get('org')}\n"
-        f"Reverse DNS:      {info.get('reverse_dns')}\n\n"
-        f"Recommendations:\n" + "\n".join(f"  • {r}" for r in recs) + "\n\n"
-        f"WHOIS:\n{info.get('whois', 'N/A')[:1000]}"
+    # Send email alert with enhanced information
+    send_email_alert(
+        attacker_ip=attacker_ip,
+        port=port,
+        service=service,
+        info=info,
+        threat_score=score,
+        severity=severity,
+        attack_type=attack_type,
+        hit_count=hit_count,
+        payload_decoded=payload,
     )
 
     # Tier 2: score >= 6 OR repeat offender (5+ hits)
@@ -490,7 +890,6 @@ def take_action(event: dict, ml_result: dict, attacker_ip: str) -> None:
         block_ip_firewall(attacker_ip)
         cats = "14" if "scan" in attack_type.lower() else "18,15"
         report_to_abuseipdb(attacker_ip, port, categories=cats)
-        send_email_alert(attacker_ip, port, service, details, subject_prefix="[HIGH]")
 
     # Tier 3: score >= 8 or (anomaly + score >= 6)
     if score >= 8 or (anomaly and score >= 6):
@@ -498,16 +897,11 @@ def take_action(event: dict, ml_result: dict, attacker_ip: str) -> None:
             f"[TIER-3] CRITICAL attacker {attacker_ip} — fail2ban + geo-block check"
         )
         add_fail2ban_rule(attacker_ip)
-        send_email_alert(attacker_ip, port, service, details, subject_prefix="[CRITICAL]")
         country = info.get("country", "Unknown")
         if country not in ("Unknown", "Localhost", "Local"):
             with state_lock:
                 country_hits[country].add(attacker_ip)
                 geo_block_country(country, country_hits[country])
-
-    # Tier 1 fallback: low score, first hit
-    elif score < 6 and hit_count <= 2:
-        send_email_alert(attacker_ip, port, service, details, subject_prefix="[ALERT]")
 
 
 # ── Fake service banners ───────────────────────────────────────────────────────
@@ -591,21 +985,31 @@ def handle_connection(
 
     # Real-time ML analysis
     ml_result: dict = {}
+    threat_score = 0
+    attack_type = "Unknown"
     ml = get_ml()
     if ml:
         try:
             ml_result          = ml.analyze_attack(event)
             event["ml_analysis"] = ml_result
-            score    = ml_result.get("threat", {}).get("threat_score", 0)
+            threat_score    = ml_result.get("threat", {}).get("threat_score", 0)
             severity = ml_result.get("threat", {}).get("severity", "INFO")
-            atype    = ml_result.get("attack_type", {}).get("predicted_type", "Unknown")
+            attack_type    = ml_result.get("attack_type", {}).get("predicted_type", "Unknown")
             logging.info(
-                f"[ML] {attacker_ip} → {atype} | score={score}/10 [{severity}]"
+                f"[ML] {attacker_ip} → {attack_type} | score={threat_score}/10 [{severity}]"
                 f" | anomaly={ml_result.get('anomaly',{}).get('is_anomaly', False)}"
                 f" | profile={ml_result.get('cluster',{}).get('profile','?')}"
             )
         except Exception as exc:
             logging.warning(f"ML analysis failed for {attacker_ip}: {exc}")
+    
+    # Record to attacker history (for tracking repeat offenders)
+    session_id = f"{attacker_ip}-{port}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    try:
+        intel = get_attacker_info_singleton()
+        intel.record_attack(attacker_ip, port, service, threat_score, attack_type, session_id)
+    except Exception as exc:
+        logging.debug(f"Failed to record attacker history: {exc}")
 
     # Persist to log
     with state_lock:

@@ -3,7 +3,6 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import { useEffect, useState, useRef } from "react"
- "react"
 import { Home, MapPin, Navigation, Wifi } from "lucide-react"
 
 interface AttackLocation {
